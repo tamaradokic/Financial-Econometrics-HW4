@@ -19,7 +19,7 @@
 
 % -- title ------------------------------------------------------------
 \title{\textbf{Modelling and Forecasting Realized Variance}\\[4pt]
-       {\large Financial Econometrics – Homework 4}\\[2pt]
+       {\large Financial Econometrics -- Homework 4}\\[2pt]
        {\normalsize ESSEC Business School | Term 3, 2025--26}}
 \author{[Group Names]}
 \date{}
@@ -34,47 +34,40 @@
 
 We study daily \emph{Realized Variance} (RV) for the 30 constituents
 of the Dow Jones Industrial Average using high-frequency intraday data
-spanning January 2003 to March 2022.  Following~\cite{andersen2001},
-RV is constructed as
+spanning January 2003 to March 2022 ($\approx$4\,800 trading days per
+stock). RV is constructed as the sum of squared 5-minute log-returns:
 \begin{equation}
   RV_t = \sum_{s=1}^{n} r_s^2, \quad r_s = \log\!\left(\frac{P_s}{P_{s-1}}\right)
 \end{equation}
-where $P_s$ is the last transaction price in the $s$-th five-minute
-interval.  Five-minute sampling is the empirical standard
-(\cite{liu2015}); it balances microstructure noise against information
-content.
+Five-minute sampling balances microstructure noise against information
+content. We compare econometric and machine learning (ML) forecasting
+models and assess cross-stock predictability via Granger causality.
 
-% -- 2. Data ----------------------------------------------------------
+% -- 2. Data and Descriptive Analysis ---------------------------------
 \section{Data and Descriptive Analysis}
 
-The raw data are one-minute OHLCV observations.  After resampling to
-five minutes and restricting to regular session hours (09:30--15:55),
-each stock yields approximately 4\,800 trading-day observations.
-Table~\ref{tab:desc} summarises the first four moments for a
-representative subset; the full table is available in the dashboard.
+Table~\ref{tab:desc} reports descriptive statistics for $\ln RV$ for
+four representative stocks. Raw RV is right-skewed and leptokurtic; the
+log-transform substantially reduces both. Sample ACFs of $\ln RV$ decay
+very slowly, consistent with long memory. Augmented Dickey--Fuller
+tests reject the unit-root null for \textbf{all 30 stocks} at the 5\%
+level, confirming stationarity of $\ln RV$ despite its persistence.
 
 \begin{table}[H]
 \centering\small
-\caption{Descriptive statistics (lnRV, selected stocks)}
+\caption{Descriptive statistics of $\ln RV$ (selected stocks)}
 \label{tab:desc}
 \begin{tabular}{lrrrr}
 \toprule
-Ticker & Mean & Std & Skew & Kurt \\
+Ticker & Mean & Variance & Skewness & Kurtosis \\
 \midrule
-AAPL & \textit{fill} & \textit{fill} & \textit{fill} & \textit{fill} \\
-JPM  & \textit{fill} & \textit{fill} & \textit{fill} & \textit{fill} \\
-MSFT & \textit{fill} & \textit{fill} & \textit{fill} & \textit{fill} \\
-GS   & \textit{fill} & \textit{fill} & \textit{fill} & \textit{fill} \\
+AAPL & $-8.74$ & $0.96$ & $0.31$ & $0.21$ \\
+JPM  & $-8.88$ & $1.09$ & $1.10$ & $1.73$ \\
+MSFT & $-9.08$ & $0.69$ & $0.79$ & $1.40$ \\
+GS   & $-8.76$ & $0.85$ & $1.23$ & $2.78$ \\
 \bottomrule
 \end{tabular}
 \end{table}
-
-Raw RV is right-skewed and leptokurtic.  The log-transform ($\ln RV$)
-substantially reduces skewness and kurtosis.  Sample ACFs of $\ln RV$
-decay very slowly, consistent with long memory.
-Augmented Dickey--Fuller (ADF) tests reject the unit-root null for
-\textbf{all 30 stocks} at the 5\% level ($p<0.05$ in every case),
-confirming stationarity of $\ln RV$ despite its persistence.
 
 % -- 3. Models --------------------------------------------------------
 \section{Models}
@@ -86,99 +79,87 @@ confirming stationarity of $\ln RV$ despite its persistence.
         + \beta_m \bar{y}^{(22)}_{t-1} + \varepsilon_t
   \label{eq:har}
 \end{equation}
-where $\bar{y}^{(n)}_{t-1}=n^{-1}\sum_{i=1}^{n}y_{t-i}$.  Equation
-\eqref{eq:har} is a restricted AR(22) estimated by OLS.
+where $\bar{y}^{(n)}_{t-1}=n^{-1}\sum_{i=1}^{n}y_{t-i}$.
+This is a restricted AR(22) estimated by OLS, capturing heterogeneous
+trader horizons. HAR coefficients are positive and economically
+meaningful across all 30 stocks, with $\beta_d > \beta_w > \beta_m$
+on average and $R^2 \approx 0.65$.
 
-\paragraph{Benchmarks.}
-AR(1) and a random walk ($\hat{y}_{t+1}=y_t$) serve as lower bounds.
+\paragraph{Benchmarks.} AR(1) and a random walk ($\hat{y}_{t+1}=y_t$).
 
 \paragraph{Machine Learning.}
-We consider four ML models using the same three HAR predictors
-($y_{t-1}$, $\bar{y}^{(5)}$, $\bar{y}^{(22)}$) for a fair comparison:
-(i) \textbf{LASSO} -- L1-regularised regression;
-(ii) \textbf{Ridge} -- L2-regularised regression;
-(iii) \textbf{XGBoost} -- gradient-boosted trees;
-(iv) \textbf{LightGBM} -- histogram-based gradient boosting;
-(v) \textbf{LSTM} -- single-layer recurrent network with a 22-day
-look-back window, trained with early stopping.
+Four ML models use the same three HAR predictors for a fair comparison:
+\textbf{LASSO} (L1-regularised), \textbf{Ridge} (L2-regularised),
+\textbf{XGBoost} (gradient-boosted trees), and
+\textbf{LightGBM} (histogram-based boosting).
+All ML models are retrained annually (every 252 trading days), following
+the approach of \cite{kilic2025}.
 
 % -- 4. Forecasting Results -------------------------------------------
 \section{Out-of-Sample Forecasting}
 
-Models are evaluated on the \textbf{last 50\%} of observations using
-an expanding window, re-estimating parameters after every forecast
-(horizon $h=1$).  We report Mean Forecast Error (MFE) and Root Mean
-Squared Error (RMSE).
-
-Table~\ref{tab:rmse} reports average RMSE across all 30 stocks.
-Key findings:
-\begin{itemize}[nosep,leftmargin=*]
-  \item The \textbf{HAR model} consistently achieves the lowest or
-        near-lowest RMSE, confirming its status as the dominant
-        benchmark in the RV literature~\cite{kilic2025}.
-  \item \textbf{LightGBM and XGBoost} rank second and third; they
-        sometimes match HAR on individual stocks.
-  \item \textbf{LSTM} offers modest improvements on stocks with
-        strong clustering (e.g.\ financials during 2008--09) but
-        higher variance overall.
-  \item \textbf{LASSO and Ridge} marginally underperform HAR,
-        confirming that regularisation adds little when the
-        predictor set is already parsimonious.
-  \item The \textbf{Random Walk} benchmark is always worst,
-        confirming significant predictability in $\ln RV$.
-\end{itemize}
+Models are evaluated on the last 50\% of observations (horizon $h=1$,
+annual retraining). Table~\ref{tab:rmse} reports average RMSE and MFE
+across all 30 stocks.
 
 \begin{table}[H]
 \centering\small
-\caption{Average RMSE across 30 DJIA stocks (OOS, $h=1$)}
+\caption{Average RMSE and MFE across 30 DJIA stocks (OOS, $h=1$)}
 \label{tab:rmse}
 \begin{tabular}{lcc}
 \toprule
 Model & Avg.\ RMSE & Avg.\ MFE \\
 \midrule
-HAR        & \textit{fill} & \textit{fill} \\
-LightGBM   & \textit{fill} & \textit{fill} \\
-XGBoost    & \textit{fill} & \textit{fill} \\
-LSTM       & \textit{fill} & \textit{fill} \\
-LASSO      & \textit{fill} & \textit{fill} \\
-Ridge      & \textit{fill} & \textit{fill} \\
-AR(1)      & \textit{fill} & \textit{fill} \\
-Rand.\ Walk& \textit{fill} & \textit{fill} \\
+Ridge     & \textbf{0.5107} & 0.0147 \\
+HAR       & 0.5108          & 0.0137 \\
+LASSO     & 0.5108          & 0.0140 \\
+XGBoost   & 0.5207          & 0.0288 \\
+LightGBM  & 0.5235          & 0.0270 \\
+AR(1)     & 0.5492          & 0.0680 \\
+Rand.\ Walk & 0.5793        & $-$0.0004 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
+Key findings: (i) HAR, LASSO, and Ridge are statistically
+indistinguishable at the top, confirming the difficulty of beating a
+well-specified linear benchmark~\cite{kilic2025}. (ii) Tree-based ML
+models (XGBoost, LightGBM) rank fourth and fifth -- competitive but
+offering no consistent improvement over HAR. (iii) The Random Walk is
+always worst, confirming significant predictability in $\ln RV$.
+(iv) All models are positively biased (MFE $>0$), except the Random
+Walk which is nearly unbiased.
+
 % -- 5. Granger Causality ---------------------------------------------
 \section{Granger Causality}
 
-We test all $30 \times 29 = 870$ ordered pairs for Granger causality
+We test all $30 \times 29 = 870$ directed pairs for Granger causality
 using the minimum F-test p-value across lags 1--10.
-\textbf{[X] pairs} are significant at the 5\% level.
+\textbf{869 out of 870 pairs} (99.9\%) are significant at the 5\%
+level, indicating pervasive cross-stock volatility spillovers across
+the DJIA. This is consistent with the strong within-index co-movement
+documented in the literature.
 
-The strongest results cluster within sectors:
-financials (JPM~$\to$~GS, AXP~$\to$~V), technology
-(AAPL~$\to$~MSFT, CSCO~$\to$~INTC), and energy (CVX~$\to$~DOW).
-Cross-sector causality is weaker and largely asymmetric.
-
-For the top-10 pairs we run bivariate VAR rolling forecasts.
-A VAR improves on the univariate HAR in \textbf{[X] out of 10} cases,
-with improvements concentrated in within-sector pairs during volatile
-subperiods.  The average RMSE reduction for winning pairs is
-approximately \textbf{[X]\%}, suggesting that Granger causality is
-statistically present but its economic forecasting value is modest.
+For the top-10 pairs by significance we run bivariate VAR forecasts
+(parameters estimated once on the training set). The VAR improves on
+the univariate HAR in \textbf{4 out of 10 cases}, with an average RMSE
+reduction of 0.004 for winning pairs. While Granger causality is
+statistically ubiquitous, its \emph{incremental} forecasting value is
+modest -- consistent with \cite{kilic2025}'s finding that ML and richer
+models offer limited gains over parsimonious benchmarks.
 
 % -- 6. Conclusion ----------------------------------------------------
 \section{Conclusion}
 
-The HAR model remains the most reliable single-asset forecasting tool
-for $\ln RV$ across the DJIA universe, consistent with
-\citeauthor{kilic2025}'s finding that transparent econometric
-specifications resist ML competition when predictors are sparse.
-Among ML alternatives, tree-based methods (LightGBM, XGBoost) offer
-marginal gains on selected stocks; LSTM is competitive during volatile
-regimes but computationally costly.  Cross-asset Granger causality is
-pervasive within sectors but adds limited forecasting value beyond the
-univariate benchmark.
+HAR, LASSO, and Ridge are jointly the best forecasting models for
+$\ln RV$ across the DJIA, with near-identical RMSE of 0.51.
+Tree-based ML methods are competitive but offer no consistent advantage.
+Cross-stock Granger causality is statistically pervasive (869/870 pairs
+significant) yet adds limited out-of-sample forecasting value, with VAR
+improvements only modest (RMSE $\Delta \approx 0.004$). These results
+reinforce the conclusion of \cite{kilic2025}: parsimonious linear
+econometric models remain the reliable benchmark for realized variance
+forecasting.
 
 % -- References -------------------------------------------------------
 \bibliographystyle{plain}
@@ -186,8 +167,8 @@ univariate benchmark.
 
 \bibitem{kilic2025}
 R.~Kilic (2025).
-\textit{Linear and nonlinear econometric models against machine learning models:
-realized volatility prediction.}
+\textit{Linear and nonlinear econometric models against machine learning
+models: realized volatility prediction.}
 Finance and Economics Discussion Series, 2025-061.
 
 \end{thebibliography}
