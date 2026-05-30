@@ -7,7 +7,7 @@ Strategy:
   - Last 50% of observations = test set
   - ECONOMETRIC models (HAR, AR1, RW): true expanding-window, refit daily (fast OLS)
   - ML models (LASSO, Ridge, XGB, LightGBM): refit every RETRAIN_EVERY steps
-  - LSTM: refit every RETRAIN_EVERY steps with early stopping
+  - ML models: refit every RETRAIN_EVERY steps
 
 Annual retraining (RETRAIN_EVERY=252) is standard practice — it matches
 the Kilic (2025) paper and reduces runtime from hours to ~20 minutes.
@@ -20,7 +20,7 @@ warnings.filterwarnings("ignore")
 
 from src.models import HARModel, AR1Model, RandomWalkModel
 from src.ml_models import (
-    LASSOModel, RidgeModel, XGBoostModel, LightGBMModel, LSTMModel,
+    LASSOModel, RidgeModel, XGBoostModel, LightGBMModel,
     build_features,
 )
 
@@ -74,26 +74,6 @@ def _rolling_ml(lnrv: np.ndarray, model_cls) -> np.ndarray:
     return forecasts
 
 
-# ── LSTM: refit every RETRAIN_EVERY steps ────────────────────────────────────
-
-def _rolling_lstm(lnrv: np.ndarray) -> np.ndarray:
-    T = len(lnrv)
-    n_test  = T // 2
-    n_train = T - n_test
-    forecasts = np.full(n_test, np.nan)
-    model = None
-    for i in range(n_test):
-        train_raw = lnrv[: n_train + i]
-        if model is None or i % RETRAIN_EVERY == 0:
-            X_tr, y_tr = build_features(train_raw)
-            model = LSTMModel(seq_len=22, hidden_size=32, epochs=30)
-            model.fit(X_tr, y_tr)
-        h = train_raw[-22:]
-        x_next = np.array([h[-1], h[-5:].mean(), h[-22:].mean()])
-        forecasts[i] = model.predict_one(x_next)
-    return forecasts
-
-
 # ── dispatcher ────────────────────────────────────────────────────────────────
 
 MODEL_REGISTRY = {
@@ -120,10 +100,8 @@ def run_all_models(lnrv: pd.Series, ticker: str = "",
         try:
             if kind == "econ":
                 fc = _rolling_econometric(arr, cls)
-            elif kind == "ml":
-                fc = _rolling_ml(arr, cls)
             else:
-                fc = _rolling_lstm(arr)
+                fc = _rolling_ml(arr, cls)
             rows.append({"Model": name, "MFE": round(mfe(actual, fc), 6),
                          "RMSE": round(rmse(actual, fc), 6), "Ticker": ticker})
             if verbose:
