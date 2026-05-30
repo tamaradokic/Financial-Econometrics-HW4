@@ -135,7 +135,11 @@ def var_forecast_pair(
 
     Returns dict with {var_rmse, var_mfe, forecasts, actual}
     """
-    from src.forecasting import mfe, rmse
+    def mfe(actual, forecast):
+    return float(np.mean(forecast - actual))
+
+def rmse(actual, forecast):
+    return float(np.sqrt(np.mean((forecast - actual) ** 2)))
     from src.models import HARModel
 
     data = lnrv_panel[[y_ticker, x_ticker]].dropna()

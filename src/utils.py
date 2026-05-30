@@ -19,22 +19,33 @@ OUTPUTS_DIR.mkdir(exist_ok=True)
 # ── persistence ───────────────────────────────────────────────────────────────
 
 def save_results(obj, filename: str) -> None:
-    """Pickle an object to the outputs/ directory."""
-    path = OUTPUTS_DIR / filename
-    with open(path, "wb") as f:
+    """Save a DataFrame to outputs/ as parquet (portable) and pickle (fast local)."""
+    import pandas as pd
+    path_pkl = OUTPUTS_DIR / filename
+    with open(path_pkl, "wb") as f:
         pickle.dump(obj, f)
-    print(f"  Saved → {path}")
+    # Also save as parquet for cross-platform use (Streamlit Cloud)
+    if isinstance(obj, pd.DataFrame):
+        pq_name = filename.replace(".pkl", ".parquet")
+        obj.to_parquet(OUTPUTS_DIR / pq_name)
+    print(f"  Saved → {path_pkl}")
 
 
 def load_results(filename: str):
-    """Load a pickled object from outputs/."""
-    path = OUTPUTS_DIR / filename
-    with open(path, "rb") as f:
+    """Load from parquet if available, else pickle."""
+    import pandas as pd
+    pq_path  = OUTPUTS_DIR / filename.replace(".pkl", ".parquet")
+    pkl_path = OUTPUTS_DIR / filename
+    if pq_path.exists():
+        return pd.read_parquet(pq_path)
+    with open(pkl_path, "rb") as f:
         return pickle.load(f)
 
 
 def results_exist(filename: str) -> bool:
-    return (OUTPUTS_DIR / filename).exists()
+    pq  = OUTPUTS_DIR / filename.replace(".pkl", ".parquet")
+    pkl = OUTPUTS_DIR / filename
+    return pq.exists() or pkl.exists()
 
 
 # ── forecast comparison plots ─────────────────────────────────────────────────

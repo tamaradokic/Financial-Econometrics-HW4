@@ -1,6 +1,9 @@
 # Raw HF data (too large — ~2GB)
 data/
 
+# Pickle files (large, use parquet instead)
+outputs/*.pkl
+
 # Pipeline log
 outputs/pipeline.log
 

@@ -21,8 +21,14 @@ import pandas as pd
 
 from sklearn.linear_model import LassoCV, RidgeCV
 from sklearn.preprocessing import StandardScaler
-import xgboost as xgb
-import lightgbm as lgb
+try:
+    import xgboost as xgb
+except ImportError:
+    xgb = None
+try:
+    import lightgbm as lgb
+except ImportError:
+    lgb = None
 
 
 # ── feature builder (shared) ─────────────────────────────────────────────────
