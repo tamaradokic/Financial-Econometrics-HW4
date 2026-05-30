@@ -49,10 +49,26 @@ models and assess cross-stock predictability via Granger causality.
 
 Table~\ref{tab:desc} reports descriptive statistics for $\ln RV$ for
 four representative stocks. Raw RV is right-skewed and leptokurtic; the
-log-transform substantially reduces both. Sample ACFs of $\ln RV$ decay
-very slowly, consistent with long memory. Augmented Dickey--Fuller
-tests reject the unit-root null for \textbf{all 30 stocks} at the 5\%
-level, confirming stationarity of $\ln RV$ despite its persistence.
+log-transform substantially reduces both. Figure~\ref{fig:lnrv} shows
+the $\ln RV$ series for AAPL — volatility spikes during the GFC (2008)
+and COVID-19 (2020) are clearly visible. Sample ACFs of $\ln RV$ decay
+very slowly (Figure~\ref{fig:acf}), confirming long memory. Augmented
+Dickey--Fuller tests reject the unit-root null for \textbf{all 30
+stocks} at the 5\% level, confirming stationarity of $\ln RV$.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{figures/fig_lnrv_aapl.png}
+  \caption{$\ln RV$ for AAPL (2003--2022).}
+  \label{fig:lnrv}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{figures/fig_acf.png}
+  \caption{Sample ACF of $\ln RV$ for AAPL. Slow decay confirms long memory.}
+  \label{fig:acf}
+\end{figure}
 
 \begin{table}[H]
 \centering\small
@@ -129,7 +145,16 @@ models (XGBoost, LightGBM) rank fourth and fifth -- competitive but
 offering no consistent improvement over HAR. (iii) The Random Walk is
 always worst, confirming significant predictability in $\ln RV$.
 (iv) All models are positively biased (MFE $>0$), except the Random
-Walk which is nearly unbiased.
+Walk which is nearly unbiased. Figure~\ref{fig:rmse} summarises these
+results visually.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{figures/fig_rmse_bar.png}
+  \caption{Average OOS RMSE across 30 DJIA stocks. HAR, LASSO, and
+           Ridge are jointly best; the Random Walk is always worst.}
+  \label{fig:rmse}
+\end{figure}
 
 % -- 5. Granger Causality ---------------------------------------------
 \section{Granger Causality}
@@ -137,9 +162,17 @@ Walk which is nearly unbiased.
 We test all $30 \times 29 = 870$ directed pairs for Granger causality
 using the minimum F-test p-value across lags 1--10.
 \textbf{869 out of 870 pairs} (99.9\%) are significant at the 5\%
-level, indicating pervasive cross-stock volatility spillovers across
-the DJIA. This is consistent with the strong within-index co-movement
-documented in the literature.
+level (Figure~\ref{fig:granger}), indicating pervasive cross-stock
+volatility spillovers across the DJIA.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{figures/fig_granger.png}
+  \caption{Granger causality p-values for 15 selected DJIA stocks.
+           Red = highly significant ($p \approx 0$); nearly all pairs
+           are significant, reflecting strong index co-movement.}
+  \label{fig:granger}
+\end{figure}
 
 For the top-10 pairs by significance we run bivariate VAR forecasts
 (parameters estimated once on the training set). The VAR improves on
