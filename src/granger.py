@@ -2,17 +2,6 @@
 granger.py
 ----------
 Pairwise Granger Causality tests across all DJIA stocks.
-
-Granger causality: stock X Granger-causes stock Y if past values of X
-contain information that helps predict Y beyond Y's own past.
-
-We test on the full sample using a VAR(p) model with lag order p selected
-by BIC (up to max_lag=10).
-
-Additionally, for pairs where causality is detected, we run the same
-rolling OOS forecasting as in forecasting.py but using a bivariate VAR
-instead of the univariate HAR — to test whether cross-stock information
-actually improves out-of-sample accuracy.
 """
 
 import numpy as np
@@ -24,6 +13,15 @@ from statsmodels.tsa.api import VAR
 import plotly.graph_objects as go
 
 
+# ── helpers ───────────────────────────────────────────────────────────────────
+
+def _mfe(actual, forecast):
+    return float(np.mean(forecast - actual))
+
+def _rmse(actual, forecast):
+    return float(np.sqrt(np.mean((forecast - actual) ** 2)))
+
+
 # ── pairwise Granger tests ────────────────────────────────────────────────────
 
 def run_pairwise_granger(
@@ -33,18 +31,10 @@ def run_pairwise_granger(
 ) -> pd.DataFrame:
     """
     Test all ordered pairs (X → Y) for Granger causality.
-
-    For each pair we use the minimum p-value across lags 1..max_lag
-    (this is conservative; a proper test would use BIC-selected lag).
-
-    Returns
-    -------
-    DataFrame with columns [From, To, min_p_value, Significant, Best_Lag]
-    sorted by p-value ascending.
+    Returns DataFrame with columns [From, To, p_value, Best_Lag, Significant].
     """
     tickers = lnrv_panel.columns.tolist()
     rows = []
-
     pairs = list(itertools.permutations(tickers, 2))
     n = len(pairs)
     print(f"Running {n} Granger causality tests …", flush=True)
@@ -53,29 +43,24 @@ def run_pairwise_granger(
         if i % 100 == 0:
             print(f"  {i}/{n} pairs done …", flush=True)
 
-        # Align and drop NaN
         data = lnrv_panel[[y_ticker, x_ticker]].dropna()
         if len(data) < 50:
             continue
 
         try:
-            # grangercausalitytests tests whether x_ticker → y_ticker
-            # it expects [y, x] ordering
             results = grangercausalitytests(data, maxlag=max_lag, verbose=False)
-            # Extract minimum p-value (F-test) across all tested lags
             pvals = {lag: res[0]["ssr_ftest"][1] for lag, res in results.items()}
             best_lag = min(pvals, key=pvals.get)
             min_p = pvals[best_lag]
-
             rows.append({
-                "From":      x_ticker,
-                "To":        y_ticker,
-                "p_value":   round(min_p, 4),
-                "Best_Lag":  best_lag,
+                "From":        x_ticker,
+                "To":          y_ticker,
+                "p_value":     round(min_p, 4),
+                "Best_Lag":    best_lag,
                 "Significant": min_p < significance,
             })
-        except Exception as e:
-            pass  # skip silently
+        except Exception:
+            pass
 
     df = pd.DataFrame(rows)
     df = df.sort_values("p_value").reset_index(drop=True)
@@ -83,12 +68,8 @@ def run_pairwise_granger(
 
 
 def granger_heatmap(granger_df: pd.DataFrame,
-                    tickers: list[str]) -> go.Figure:
-    """
-    Heatmap of Granger causality p-values (From → To).
-    Cells below 0.05 are highlighted.
-    """
-    # Build p-value matrix
+                    tickers: list) -> go.Figure:
+    """Heatmap of Granger causality p-values (From → To)."""
     mat = pd.DataFrame(np.nan, index=tickers, columns=tickers)
     for _, row in granger_df.iterrows():
         mat.loc[row["From"], row["To"]] = row["p_value"]
@@ -97,7 +78,7 @@ def granger_heatmap(granger_df: pd.DataFrame,
         z=mat.values,
         x=mat.columns.tolist(),
         y=mat.index.tolist(),
-        colorscale="RdYlGn_r",   # red = low p-value (significant)
+        colorscale="RdYlGn_r",
         zmin=0, zmax=0.1,
         colorbar=dict(title="p-value"),
     ))
@@ -111,14 +92,13 @@ def granger_heatmap(granger_df: pd.DataFrame,
     return fig
 
 
-def top_granger_pairs(granger_df: pd.DataFrame,
-                      n: int = 20) -> pd.DataFrame:
+def top_granger_pairs(granger_df: pd.DataFrame, n: int = 20) -> pd.DataFrame:
     """Return the top-n most significant Granger causality pairs."""
     sig = granger_df[granger_df["Significant"]].head(n)
     return sig[["From", "To", "p_value", "Best_Lag"]].copy()
 
 
-# ── VAR rolling forecasts for Granger-significant pairs ─────────────────────
+# ── VAR forecasts for Granger-significant pairs ───────────────────────────────
 
 def var_forecast_pair(
     lnrv_panel: pd.DataFrame,
@@ -126,36 +106,17 @@ def var_forecast_pair(
     y_ticker: str,
     max_lag: int = 5,
 ) -> dict:
-    """
-    Rolling OOS forecast for a Granger-significant pair (X → Y) using VAR.
-
-    We compare:
-      - Univariate HAR for Y  (baseline, from forecasting.py)
-      - Bivariate VAR(p) for Y including X as predictor
-
-    Returns dict with {var_rmse, var_mfe, forecasts, actual}
-    """
-    def mfe(actual, forecast):
-    return float(np.mean(forecast - actual))
-
-def rmse(actual, forecast):
-    return float(np.sqrt(np.mean((forecast - actual) ** 2)))
-    from src.models import HARModel
-
-    data = lnrv_panel[[y_ticker, x_ticker]].dropna()
-    arr_y = data[y_ticker].values
-    T     = len(arr_y)
+    """Fit VAR once on training set, forecast over test set."""
+    data    = lnrv_panel[[y_ticker, x_ticker]].dropna()
+    arr_y   = data[y_ticker].values
+    T       = len(arr_y)
     n_test  = T // 2
     n_train = T - n_test
     actual  = arr_y[n_train:]
-
     var_forecasts = np.full(n_test, np.nan)
 
-    # Fit VAR once on the training set, then use fixed params for all test forecasts
-    # This mirrors how HAR is benchmarked and is fast enough for comparison purposes
     try:
-        train_data = data.iloc[:n_train]
-        res = VAR(train_data).fit(maxlags=max_lag, ic="bic")
+        res  = VAR(data.iloc[:n_train]).fit(maxlags=max_lag, ic="bic")
         k_ar = res.k_ar
     except Exception:
         return {"pair": f"{x_ticker}→{y_ticker}", "var_rmse": np.nan,
@@ -164,17 +125,16 @@ def rmse(actual, forecast):
     for i in range(n_test):
         try:
             history = data.iloc[max(0, n_train + i - k_ar): n_train + i].values
-            fc = res.forecast(history, steps=1)
-            var_forecasts[i] = fc[0, 0]
+            var_forecasts[i] = res.forecast(history, steps=1)[0, 0]
         except Exception:
             var_forecasts[i] = arr_y[n_train + i - 1]
 
     return {
-        "pair":       f"{x_ticker}→{y_ticker}",
-        "var_rmse":   round(rmse(actual, var_forecasts), 6),
-        "var_mfe":    round(mfe(actual, var_forecasts), 6),
-        "forecasts":  var_forecasts,
-        "actual":     actual,
+        "pair":      f"{x_ticker}→{y_ticker}",
+        "var_rmse":  round(_rmse(actual, var_forecasts), 6),
+        "var_mfe":   round(_mfe(actual, var_forecasts), 6),
+        "forecasts": var_forecasts,
+        "actual":    actual,
     }
 
 
@@ -184,22 +144,15 @@ def run_var_for_significant_pairs(
     har_results: pd.DataFrame,
     top_n: int = 10,
 ) -> pd.DataFrame:
-    """
-    For the top-n Granger pairs, run VAR rolling forecast and compare RMSE
-    against the univariate HAR benchmark.
-
-    Returns comparison DataFrame.
-    """
+    """Run VAR for top Granger pairs and compare against HAR benchmark."""
     pairs = top_granger_pairs(granger_df, n=top_n)
     rows  = []
 
     for _, row in pairs.iterrows():
         x, y = row["From"], row["To"]
         print(f"  VAR forecast: {x} → {y}", flush=True)
-
         res = var_forecast_pair(lnrv_panel, x, y)
 
-        # HAR RMSE for Y (from main forecast results)
         har_row = har_results[
             (har_results["Ticker"] == y) & (har_results["Model"] == "HAR")
         ]
