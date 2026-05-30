@@ -1,6 +1,8 @@
-# Data (large files — do not commit)
+# Raw HF data (too large — ~2GB)
 data/
-outputs/
+
+# Pipeline log
+outputs/pipeline.log
 
 # Python
 __pycache__/
