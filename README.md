@@ -2,7 +2,8 @@
 
 **MSc in Data Sciences and Business Analytics | ESSEC Business School & CentraleSupélec | 2025–26**
 
-🚀 **[Live Dashboard](https://tamaradokic-financial-econometrics-hw4-app-rql3ht.streamlit.app/)** — Interactive Streamlit app
+🚀 **[Live Dashboard](https://tamaradokic-financial-econometrics-hw4-app-rql3ht.streamlit.app/)** — Interactive Streamlit app  
+📄 **[Report PDF](report/FinEc_HW4_report.pdf)** — 2-page academic report
 
 ---
 
