@@ -84,7 +84,7 @@ def sidebar(data: dict) -> str:
         "**Data:** Jan 2003 – Mar 2022  \n"
         "**Stocks:** 30 DJIA constituents  \n"
         "**RV frequency:** Daily (5-min sampling)  \n"
-        "**Models:** HAR, AR(1), RW, LASSO, Ridge, XGBoost, LightGBM, LSTM"
+        "**Models:** HAR, AR(1), RW, LASSO, Ridge, XGBoost, LightGBM"
     )
     return ticker
 

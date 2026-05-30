@@ -12,26 +12,26 @@ RV is built from 5-minute log-returns following Andersen et al. (2001):
 
 $$RV_t = \sum_{s=1}^{n} r_s^2, \quad r_s = \log\left(\frac{P_s}{P_{s-1}}\right)$$
 
-Seven forecasting models are evaluated head-to-head in a rolling out-of-sample framework (last 50% of data, expanding window, h=1 day):
+Seven forecasting models are evaluated head-to-head in a rolling out-of-sample framework (last 50% of data, annual retraining, h=1 day):
 
 | Category | Model |
 |---|---|
 | Econometric benchmarks | HAR, AR(1), Random Walk |
 | Regularised regression | LASSO, Ridge |
 | Tree-based ML | XGBoost, LightGBM |
-| Deep learning | LSTM |
 
-Cross-stock predictability is assessed via **pairwise Granger causality tests** across all 870 directed pairs.
+Cross-stock predictability is assessed via **pairwise Granger causality tests** across all 870 directed pairs, with bivariate VAR models used to test whether detected causality improves forecasting (Q12).
 
 ---
 
 ## Key Findings
 
-- **HAR dominates**: The Heterogeneous Autoregressive model achieves the lowest or near-lowest RMSE across the majority of stocks, consistent with the recent literature (Kilic, 2025; Branco et al., 2024).
-- **Tree-based ML is competitive**: LightGBM and XGBoost rank second on average; they match HAR on several individual stocks but offer no consistent improvement.
-- **LSTM adds value selectively**: During high-volatility regimes (2008–09, 2020), LSTM's temporal memory provides modest gains; it underperforms in calm periods.
-- **Granger causality is pervasive within sectors**: Significant cross-stock predictability is concentrated in financial services (JPM→GS), technology (AAPL→MSFT), and energy (CVX→DOW) — but VAR models incorporating these predictors improve OOS accuracy in only a subset of cases.
-- **lnRV is stationary**: ADF tests reject the unit root for all 30 stocks at the 5% level.
+- **HAR, LASSO, and Ridge** achieve near-identical best RMSE (≈0.511), confirming the difficulty of beating a well-specified linear benchmark (Kilic, 2025).
+- **XGBoost and LightGBM** are competitive but offer no consistent advantage over HAR.
+- **Random Walk** is always worst, confirming significant predictability in lnRV.
+- **869 out of 870 Granger pairs** are significant at 5% — volatility spillovers are pervasive across the DJIA.
+- **VAR models** improve on HAR in only 4 out of 10 tested pairs, with modest RMSE gains (~0.004), suggesting Granger causality is statistically present but has limited forecasting value.
+- **lnRV is stationary** for all 30 stocks (ADF tests reject unit root at 5%).
 
 ---
 
@@ -43,10 +43,11 @@ Cross-stock predictability is assessed via **pairwise Granger causality tests** 
 │   ├── rv_construction.py    5-min resampling → daily RV → lnRV → HAR features
 │   ├── eda.py                Descriptive stats, ADF tests, Plotly charts
 │   ├── models.py             HAR, AR(1), Random Walk (OLS)
-│   ├── ml_models.py          LASSO, Ridge, XGBoost, LightGBM, LSTM (PyTorch)
+│   ├── ml_models.py          LASSO, Ridge, XGBoost, LightGBM
 │   ├── forecasting.py        Unified rolling OOS engine (MFE, RMSE)
 │   ├── granger.py            Pairwise Granger tests + VAR forecasting
 │   └── utils.py              Caching, shared plots, formatting
+├── outputs/                  Pre-computed results (loaded by dashboard)
 ├── app.py                    Streamlit interactive dashboard
 ├── run_pipeline.py           Master script — runs all steps, saves outputs/
 ├── report/
@@ -72,21 +73,19 @@ Place the raw data files in a `data/` folder at the project root:
 - One CSV per ticker (e.g. `AAPL.csv`) — 5 columns: Open, High, Low, Close, Volume; no header
 - `HFdaylistdates.csv` — shared 1-minute timestamp index
 
-### 3. Run the pipeline
+### 3. Run the pipeline (optional — outputs already included)
 
 ```bash
 python run_pipeline.py
 ```
 
-This runs all steps (RV construction → EDA → HAR → rolling forecasts → Granger tests) and caches results in `outputs/`. On a standard laptop this takes **~60–90 minutes** due to the 30-stock × 7-model rolling OOS loop. Results are cached so subsequent runs are instant.
+Results are pre-computed and saved in `outputs/`. This step is only needed if you want to re-run the analysis from scratch.
 
 ### 4. Launch the dashboard
 
 ```bash
 streamlit run app.py
 ```
-
-Open `http://localhost:8501` in your browser. The dashboard loads from cached outputs.
 
 ---
 
@@ -104,10 +103,6 @@ Open `http://localhost:8501` in your browser. The dashboard loads from cached ou
 
 ---
 
-## References
+## Reference
 
-- Andersen, T.G. et al. (2001). *The Distribution of Realized Stock Return Volatility*. JFE.
-- Corsi, F. (2009). *A Simple Approximate Long-Memory Model of Realized Volatility*. JFEC.
-- Liu, L.Y., Patton, A.J., Sheppard, K. (2015). *Does Anything Beat 5-Minute RV?* JOE.
-- Kilic, R. (2025). *Linear and nonlinear econometric models against ML models: RV prediction*. FEDS 2025-061.
-- Branco, R.R. et al. (2024). *Forecasting realized volatility: Does anything beat linear models?* JEF.
+Kilic, R. (2025). *Linear and nonlinear econometric models against machine learning models: realized volatility prediction.* Finance and Economics Discussion Series, 2025-061.
