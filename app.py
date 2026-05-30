@@ -193,8 +193,7 @@ def tab_har(data: dict, ticker: str) -> None:
         The **Heterogeneous Autoregressive (HAR)** model (Corsi, 2009) decomposes
         realized variance into daily, weekly, and monthly components:
 
-        $$y_t = \beta_0 + \beta_d \cdot y_{t-1} + \beta_w \cdot \bar{y}^{(5)}_{t-1}
-               + \beta_m \cdot \bar{y}^{(22)}_{t-1} + \varepsilon_t$$
+        $$y_t = \beta_0 + \beta_d \cdot y_{t-1} + \beta_w \cdot \bar{y}^{(5)}_{t-1} + \beta_m \cdot \bar{y}^{(22)}_{t-1} + \varepsilon_t$$
 
         This is a **restricted AR(22)** estimated by OLS, capturing the heterogeneity
         of market participants operating at different horizons.

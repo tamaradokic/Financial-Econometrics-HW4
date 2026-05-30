@@ -1,6 +1,8 @@
 # Modelling and Forecasting Realized Variance — DJIA Stocks
 
-**Financial Econometrics | ESSEC Business School | 2025–26**
+**MSc in Data Sciences and Business Analytics | ESSEC Business School & CentraleSupélec | 2025–26**
+
+🚀 **[Live Dashboard](https://tamaradokic-financial-econometrics-hw4-app-rql3ht.streamlit.app/)** — Interactive Streamlit app
 
 ---
 
